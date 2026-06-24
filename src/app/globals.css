@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
+/* ─── Flypings Design Tokens ─────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-primary: #8B5CF6;
+  --brand-primary-hover: #7C3AED;
+  --brand-accent: #EC4899;
+  --brand-accent-hover: #DB2777;
+  --brand-gradient: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+
+  /* Backgrounds */
+  --bg-base: #09090B;
+  --bg-surface: #18181B;
+  --bg-elevated: #1F1F23;
+  --bg-overlay: #27272A;
+
+  /* Borders */
+  --border-subtle: #27272A;
+  --border-default: #3F3F46;
+  --border-strong: #52525B;
+
+  /* Text */
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  --text-disabled: #52525B;
+
+  /* Semantic */
+  --success: #22C55E;
+  --success-bg: #14532D22;
+  --warning: #F59E0B;
+  --warning-bg: #78350F22;
+  --danger: #EF4444;
+  --danger-bg: #7F1D1D22;
+  --info: #3B82F6;
+  --info-bg: #1E3A5F22;
 }
 
+/* ─── Tailwind v4 Theme ───────────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Brand Colors */
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-accent: var(--brand-accent);
+  --color-accent-hover: var(--brand-accent-hover);
+
+  /* Background Tokens */
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-overlay: var(--bg-overlay);
+
+  /* Border Tokens */
+  --color-border-subtle: var(--border-subtle);
+  --color-border: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  /* Text Tokens */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  /* Semantic */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Global Base ─────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), Arial, sans-serif;
+  min-height: 100vh;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* ─── Gradient Utilities ──────────────────────────────────────────── */
+.gradient-brand {
+  background: var(--brand-gradient);
+}
+
+.gradient-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-border {
+  position: relative;
+  border-radius: 12px;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--brand-gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Glow Effects ────────────────────────────────────────────────── */
+.glow-brand {
+  box-shadow: 0 0 24px 0 #8B5CF640;
+}
+.glow-accent {
+  box-shadow: 0 0 24px 0 #EC489940;
 }
