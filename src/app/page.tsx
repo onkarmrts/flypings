@@ -448,7 +448,7 @@ function Features() {
                 className="w-11 h-11 rounded-xl flex items-center justify-center mb-5"
                 style={{ backgroundColor: `${f.tagColor}15`, border: `1px solid ${f.tagColor}30` }}
               >
-                <f.Icon className="w-5 h-5" style={{ color: f.tagColor } as React.CSSProperties} />
+                <span style={{ color: f.tagColor }}><f.Icon className="w-5 h-5" /></span>
               </div>
 
               {/* Tag */}

@@ -89,7 +89,7 @@ export default async function BillingPage() {
                   <span className="text-[#71717A] text-xs">/mo</span>
                 </div>
               </div>
-              <p className="text-[#71717A] text-xs mb-3">{plan.desc}</p>
+              <p className="text-[#71717A] text-xs mb-3">{plan.features[0]}</p>
               <div className="flex items-center justify-between text-xs text-[#52525B]">
                 <span>{plan.limits.instagramAccounts} IG account{plan.limits.instagramAccounts > 1 ? "s" : ""}</span>
                 <span>{plan.limits.dmsPerMonth.toLocaleString("en-IN")} DMs/mo</span>

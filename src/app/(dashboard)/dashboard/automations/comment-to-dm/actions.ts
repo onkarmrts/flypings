@@ -45,7 +45,7 @@ export async function saveCommentToDM(formData: FormData): Promise<SaveResult> {
     {
       type: "send_dm_with_link",
       message,
-      link: link || undefined,
+      link: link || null,
     },
   ];
 

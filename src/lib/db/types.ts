@@ -5,7 +5,7 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
-          id: string;                  // matches auth.users.id
+          id: string;
           email: string;
           full_name: string | null;
           avatar_url: string | null;
@@ -14,8 +14,22 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          plan_id?: "starter" | "growth" | "pro" | "agency" | null;
+          trial_ends_at?: string | null;
+        };
+        Update: {
+          email?: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          plan_id?: "starter" | "growth" | "pro" | "agency" | null;
+          trial_ends_at?: string | null;
+        };
+        Relationships: [];
       };
 
       instagram_accounts: {
@@ -26,15 +40,35 @@ export type Database = {
           username: string;
           name: string;
           profile_pic_url: string | null;
-          access_token: string;         // encrypted in DB
+          access_token: string;
           token_expires_at: string | null;
           followers_count: number;
           is_active: boolean;
           connected_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["instagram_accounts"]["Row"], "connected_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["instagram_accounts"]["Insert"]>;
+        Insert: {
+          id?: string;
+          user_id: string;
+          ig_user_id: string;
+          username: string;
+          name: string;
+          profile_pic_url?: string | null;
+          access_token: string;
+          token_expires_at?: string | null;
+          followers_count?: number;
+          is_active?: boolean;
+        };
+        Update: {
+          username?: string;
+          name?: string;
+          profile_pic_url?: string | null;
+          access_token?: string;
+          token_expires_at?: string | null;
+          followers_count?: number;
+          is_active?: boolean;
+        };
+        Relationships: [];
       };
 
       automations: {
@@ -45,16 +79,37 @@ export type Database = {
           name: string;
           description: string | null;
           trigger_type: "comment_keyword" | "story_reply" | "story_poll_vote" | "dm_keyword" | "live_comment" | "mention";
-          trigger_config: Json;          // TriggerConfig from automation.ts
-          actions: Json;                 // ActionConfig[] from automation.ts
+          trigger_config: Json;
+          actions: Json;
           is_active: boolean;
           reply_once: boolean;
-          post_id: string | null;        // null = apply to all posts
+          post_id: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["automations"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["automations"]["Insert"]>;
+        Insert: {
+          id?: string;
+          user_id: string;
+          account_id: string;
+          name: string;
+          description?: string | null;
+          trigger_type: "comment_keyword" | "story_reply" | "story_poll_vote" | "dm_keyword" | "live_comment" | "mention";
+          trigger_config?: Json;
+          actions?: Json;
+          is_active?: boolean;
+          reply_once?: boolean;
+          post_id?: string | null;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+          trigger_config?: Json;
+          actions?: Json;
+          is_active?: boolean;
+          reply_once?: boolean;
+          post_id?: string | null;
+        };
+        Relationships: [];
       };
 
       dm_logs: {
@@ -71,8 +126,20 @@ export type Database = {
           error: string | null;
           sent_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["dm_logs"]["Row"], "sent_at">;
+        Insert: {
+          id?: string;
+          automation_id: string;
+          account_id: string;
+          recipient_ig_id: string;
+          recipient_username?: string | null;
+          trigger_type: string;
+          trigger_text?: string | null;
+          message_sent: string;
+          status: "sent" | "failed" | "skipped";
+          error?: string | null;
+        };
         Update: never;
+        Relationships: [];
       };
 
       leads: {
@@ -95,8 +162,35 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["leads"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["leads"]["Insert"]>;
+        Insert: {
+          id?: string;
+          user_id: string;
+          account_id: string;
+          ig_user_id: string;
+          username: string;
+          full_name?: string | null;
+          profile_pic_url?: string | null;
+          source_automation_id?: string | null;
+          source_trigger?: string | null;
+          tags?: string[];
+          notes?: string | null;
+          whatsapp_number?: string | null;
+          email?: string | null;
+          status?: "new" | "contacted" | "converted" | "lost";
+          converted_at?: string | null;
+        };
+        Update: {
+          username?: string;
+          full_name?: string | null;
+          profile_pic_url?: string | null;
+          tags?: string[];
+          notes?: string | null;
+          whatsapp_number?: string | null;
+          email?: string | null;
+          status?: "new" | "contacted" | "converted" | "lost";
+          converted_at?: string | null;
+        };
+        Relationships: [];
       };
 
       subscriptions: {
@@ -112,22 +206,52 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["subscriptions"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
+        Insert: {
+          id?: string;
+          user_id: string;
+          plan_id: "starter" | "growth" | "pro" | "agency";
+          status: "active" | "past_due" | "cancelled" | "trialing";
+          razorpay_subscription_id?: string | null;
+          current_period_start: string;
+          current_period_end: string;
+          cancel_at_period_end?: boolean;
+        };
+        Update: {
+          plan_id?: "starter" | "growth" | "pro" | "agency";
+          status?: "active" | "past_due" | "cancelled" | "trialing";
+          razorpay_subscription_id?: string | null;
+          current_period_start?: string;
+          current_period_end?: string;
+          cancel_at_period_end?: boolean;
+        };
+        Relationships: [];
       };
 
       automation_stats: {
         Row: {
           id: string;
           automation_id: string;
-          date: string;              // YYYY-MM-DD
+          date: string;
           triggered: number;
           dms_sent: number;
           links_clicked: number;
           conversions: number;
         };
-        Insert: Omit<Database["public"]["Tables"]["automation_stats"]["Row"], "id">;
-        Update: Partial<Database["public"]["Tables"]["automation_stats"]["Insert"]>;
+        Insert: {
+          automation_id: string;
+          date: string;
+          triggered?: number;
+          dms_sent?: number;
+          links_clicked?: number;
+          conversions?: number;
+        };
+        Update: {
+          triggered?: number;
+          dms_sent?: number;
+          links_clicked?: number;
+          conversions?: number;
+        };
+        Relationships: [];
       };
     };
 
@@ -140,6 +264,7 @@ export type Database = {
           total_links_clicked: number;
           total_conversions: number;
         };
+        Relationships: [];
       };
     };
 
