@@ -24,30 +24,39 @@ export function MobileTopbar() {
 
   return (
     <header className="sticky top-0 z-40 bg-[#09090B]/90 backdrop-blur-xl border-b border-[#27272A] md:hidden">
-      <div className="flex items-center justify-between px-4 h-14">
+      <div className="flex items-center justify-between px-4 h-14 gap-3">
+
+        {/* Left: back button OR logo */}
         {meta.back ? (
-          <Link href={meta.back} className="flex items-center gap-1.5 text-[#A1A1AA] hover:text-white transition-colors -ml-1 p-1">
+          <Link
+            href={meta.back}
+            className="flex items-center gap-1 text-[#A1A1AA] hover:text-white transition-colors shrink-0 -ml-1 px-1 py-2"
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
             </svg>
-            <span className="text-sm">Back</span>
+            <span className="text-sm font-medium">Back</span>
           </Link>
         ) : (
           <Logo size="sm" />
         )}
 
-        <h1 className={`text-white font-semibold text-base ${meta.back ? "absolute left-1/2 -translate-x-1/2" : ""}`}>
-          {meta.back ? meta.title : ""}
-        </h1>
+        {/* Center: page title (only on sub-pages with back button) */}
+        {meta.back && (
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-white font-semibold text-base truncate max-w-[160px] text-center">
+            {meta.title}
+          </h1>
+        )}
 
-        {/* Notification */}
-        <button className="relative w-10 h-10 flex items-center justify-center rounded-xl text-[#71717A] hover:text-white active:bg-[#27272A] transition-colors">
+        {/* Right: notification bell */}
+        <button className="relative w-10 h-10 flex items-center justify-center rounded-xl text-[#71717A] hover:text-white active:bg-[#27272A] transition-colors shrink-0">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#EC4899] border-2 border-[#09090B]" />
         </button>
+
       </div>
     </header>
   );
