@@ -27,16 +27,6 @@ function ConnectBanner() {
   );
 }
 
-/* ─── Stat pill ───────────────────────────────────────────────────────────── */
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex-1 bg-[#18181B] border border-[#27272A] rounded-xl px-4 py-3 text-center">
-      <p className="text-xl font-bold text-white">{value}</p>
-      <p className="text-[#71717A] text-xs mt-0.5">{label}</p>
-    </div>
-  );
-}
-
 /* ─── HERO — Comment to DM ────────────────────────────────────────────────── */
 function CommentToDMCard({ hasAutomation }: { hasAutomation: boolean }) {
   return (
@@ -225,14 +215,6 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .eq("is_active", true);
 
-  const today = new Date().toISOString().split("T")[0];
-
-  const { count: dmsToday } = await supabase
-    .from("dm_logs")
-    .select("id", { count: "exact", head: true })
-    .gte("sent_at", `${today}T00:00:00`)
-    .eq("status", "sent");
-
   const { count: commentAutomations } = await supabase
     .from("automations")
     .select("id", { count: "exact", head: true })
@@ -252,14 +234,6 @@ export default async function DashboardPage() {
         <p className="text-[#71717A] text-sm mt-0.5">What do you want to automate today?</p>
       </div>
 
-      {/* Stats — only show if Instagram is connected */}
-      {igConnected && (
-        <div className="flex gap-3 mb-5">
-          <StatPill label="DMs today" value={dmsToday?.toLocaleString("en-IN") ?? "0"} />
-          <StatPill label="This month" value="0" />
-          <StatPill label="Total leads" value="0" />
-        </div>
-      )}
 
       {/* Connect Instagram */}
       {!igConnected && <ConnectBanner />}
