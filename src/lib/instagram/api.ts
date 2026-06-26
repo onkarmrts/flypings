@@ -188,26 +188,42 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   }
   const longToken = step2.access_token;
 
-  // Step 3: Get Facebook Pages → find linked IG account
+  // Step 3a: Get Facebook Pages → find linked IG business account
   const pagesRes = await fetch(
-    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,instagram_business_account`
+    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token,instagram_business_account`
   );
   const pages = await pagesRes.json();
-  console.log("[IG Connect] Step3 pages:", JSON.stringify(pages));
+  console.log("[IG Connect] Step3a pages:", JSON.stringify(pages));
 
   const page = pages.data?.find(
     (p: { instagram_business_account?: { id: string } }) => p.instagram_business_account
   );
 
-  if (!page) {
-    throw new Error(
-      "No Instagram Professional account linked to this Facebook Page."
-    );
+  if (page) {
+    // Use the Page's own access token for API calls (required for messaging)
+    const pageToken = page.access_token ?? longToken;
+    return {
+      pageAccessToken: pageToken,
+      igUserId: page.instagram_business_account.id as string,
+      pageName: page.name as string,
+    };
   }
 
-  return {
-    pageAccessToken: longToken,
-    igUserId: page.instagram_business_account.id as string,
-    pageName: page.name as string,
-  };
+  // Step 3b: Fallback — try Instagram accounts linked to personal Facebook profile
+  const igAccountsRes = await fetch(
+    `${FB_BASE_URL}/me/instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${longToken}`
+  );
+  const igAccounts = await igAccountsRes.json();
+  console.log("[IG Connect] Step3b instagram_accounts:", JSON.stringify(igAccounts));
+
+  const igAccount = igAccounts.data?.[0];
+  if (igAccount) {
+    return {
+      pageAccessToken: longToken,
+      igUserId: igAccount.id as string,
+      pageName: igAccount.username as string,
+    };
+  }
+
+  throw new Error("No Instagram Professional account linked to this Facebook account. Create a Facebook Page and link your Instagram to it.");
 }
