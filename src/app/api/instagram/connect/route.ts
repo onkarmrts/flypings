@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken, buildFacebookOAuthURL, InstagramClient } from "@/lib/instagram/api";
 import { createClient } from "@/lib/db/supabase-server";
 
-const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/instagram/connect`;
+const APP_URL = process.env.NODE_ENV === "production"
+  ? "https://flypings.vercel.app"
+  : "http://localhost:3000";
+
+const REDIRECT_URI = `${APP_URL}/api/instagram/connect`;
 
 /**
  * GET — two jobs:
@@ -17,7 +21,7 @@ export async function GET(req: NextRequest) {
   // ── User denied permission on Facebook ──────────────────────────────────
   if (error) {
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/instagram?error=denied`
+      `${APP_URL}/dashboard/settings/instagram?error=denied`
     );
   }
 
@@ -34,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   if (!user) {
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/login?next=/dashboard/settings/instagram`
+      `${APP_URL}/login?next=/dashboard/settings/instagram`
     );
   }
 
@@ -68,19 +72,19 @@ export async function GET(req: NextRequest) {
     await subscribeToWebhooks(igUserId, pageAccessToken);
 
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/instagram?success=connected`
+      `${APP_URL}/dashboard/settings/instagram?success=connected`
     );
   } catch (err) {
     console.error("Instagram connect error:", err);
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/instagram?error=failed`
+      `${APP_URL}/dashboard/settings/instagram?error=failed`
     );
   }
 }
 
 /** Subscribe the IG account to webhook fields so comments trigger our endpoint */
 async function subscribeToWebhooks(igUserId: string, accessToken: string) {
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/instagram/webhook`;
+  const webhookUrl = `${APP_URL}/api/instagram/webhook`;
 
   await fetch(
     `https://graph.facebook.com/v21.0/${igUserId}/subscribed_apps`,
