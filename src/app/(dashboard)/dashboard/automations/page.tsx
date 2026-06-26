@@ -84,10 +84,13 @@ export default async function AutomationsPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  const { data: dmStats } = await supabase
-    .from("dm_logs")
-    .select("automation_id, status")
-    .in("automation_id", (automations ?? []).map((a) => a.id));
+  const automationIds = (automations ?? []).map((a) => a.id);
+  const { data: dmStats } = automationIds.length > 0
+    ? await supabase
+        .from("dm_logs")
+        .select("automation_id, status")
+        .in("automation_id", automationIds)
+    : { data: [] as Array<{ automation_id: string; status: string }> };
 
   const statsByAutomation: Record<string, { sent: number; skipped: number }> = {};
   for (const log of dmStats ?? []) {
@@ -194,9 +197,6 @@ export default async function AutomationsPage() {
                         <button
                           type="submit"
                           className="text-[#52525B] hover:text-[#EF4444] text-xs transition-colors"
-                          onClick={(e) => {
-                            if (!confirm("Delete this automation?")) e.preventDefault();
-                          }}
                         >
                           Delete
                         </button>
