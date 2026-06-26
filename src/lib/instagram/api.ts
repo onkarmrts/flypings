@@ -129,68 +129,80 @@ export class InstagramAPIError extends Error {
 }
 
 /**
- * Build the Instagram Business Login OAuth URL.
- * Uses Instagram's own OAuth — no Facebook Page required.
+ * Build the Facebook OAuth URL to connect an Instagram account.
  */
 export function buildFacebookOAuthURL(redirectUri: string, state: string) {
   const params = new URLSearchParams({
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: redirectUri,
     scope: [
-      "instagram_business_basic",
-      "instagram_business_manage_messages",
-      "instagram_business_manage_comments",
+      "instagram_basic",
+      "instagram_manage_messages",
+      "instagram_manage_comments",
+      "pages_show_list",
     ].join(","),
     response_type: "code",
     state,
   });
 
-  return `https://www.instagram.com/oauth/authorize?${params}`;
+  return `https://www.facebook.com/v21.0/dialog/oauth?${params}`;
 }
 
 /**
- * Exchange auth code → long-lived Instagram token → IG user ID
- * Uses Instagram Business Login flow (no Facebook Page needed)
+ * Exchange auth code → page access token → IG user ID
  */
 export async function exchangeCodeForToken(code: string, redirectUri: string) {
-  // Step 1: Code → short-lived Instagram token
-  const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.FACEBOOK_APP_ID!,
-      client_secret: process.env.FACEBOOK_APP_SECRET!,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-      code,
-    }),
-  });
+  // Step 1: Code → short-lived user token
+  const tokenRes = await fetch(
+    `${FB_BASE_URL}/oauth/access_token?` +
+      new URLSearchParams({
+        client_id: process.env.FACEBOOK_APP_ID!,
+        client_secret: process.env.FACEBOOK_APP_SECRET!,
+        redirect_uri: redirectUri,
+        code,
+      })
+  );
   const step1 = await tokenRes.json();
-  console.log("[IG Connect] Step1 token exchange:", step1.access_token ? "OK" : JSON.stringify(step1));
+  console.log("[IG Connect] Step1:", step1.access_token ? "OK" : JSON.stringify(step1));
   if (!step1.access_token) {
-    throw new Error(`Step1 failed: ${step1.error_message ?? JSON.stringify(step1)}`);
+    throw new Error(`Token exchange failed: ${step1.error?.message ?? JSON.stringify(step1)}`);
   }
-  const shortToken = step1.access_token as string;
-  const igUserId = String(step1.user_id);
 
   // Step 2: Short-lived → long-lived token (60 days)
   const longRes = await fetch(
-    `https://graph.instagram.com/access_token?` +
+    `${FB_BASE_URL}/oauth/access_token?` +
       new URLSearchParams({
-        grant_type: "ig_exchange_token",
+        grant_type: "fb_exchange_token",
+        client_id: process.env.FACEBOOK_APP_ID!,
         client_secret: process.env.FACEBOOK_APP_SECRET!,
-        access_token: shortToken,
+        fb_exchange_token: step1.access_token,
       })
   );
   const step2 = await longRes.json();
-  console.log("[IG Connect] Step2 long token:", step2.access_token ? "OK" : JSON.stringify(step2));
+  console.log("[IG Connect] Step2:", step2.access_token ? "OK" : JSON.stringify(step2));
   if (!step2.access_token) {
-    throw new Error(`Step2 failed: ${step2.error?.message ?? JSON.stringify(step2)}`);
+    throw new Error(`Long token failed: ${step2.error?.message ?? JSON.stringify(step2)}`);
+  }
+  const longToken = step2.access_token as string;
+
+  // Step 3: Get Facebook Pages with linked Instagram
+  const pagesRes = await fetch(
+    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token,instagram_business_account`
+  );
+  const pages = await pagesRes.json();
+  console.log("[IG Connect] Pages:", JSON.stringify(pages));
+
+  const page = pages.data?.find(
+    (p: { instagram_business_account?: { id: string } }) => p.instagram_business_account
+  );
+
+  if (!page) {
+    throw new Error("no_instagram_page");
   }
 
   return {
-    pageAccessToken: step2.access_token as string,
-    igUserId,
-    pageName: igUserId,
+    pageAccessToken: (page.access_token ?? longToken) as string,
+    igUserId: page.instagram_business_account.id as string,
+    pageName: page.name as string,
   };
 }
