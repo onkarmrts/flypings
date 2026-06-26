@@ -9,15 +9,19 @@ export function verifyWebhookSignature(
   rawBody: string,
   signature: string
 ): boolean {
-  const appSecret = process.env.FACEBOOK_APP_SECRET!;
-  const expected = `sha256=${crypto
-    .createHmac("sha256", appSecret)
-    .update(rawBody)
-    .digest("hex")}`;
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signature)
-  );
+  try {
+    const appSecret = process.env.FACEBOOK_APP_SECRET!;
+    const expected = `sha256=${crypto
+      .createHmac("sha256", appSecret)
+      .update(rawBody)
+      .digest("hex")}`;
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 /**

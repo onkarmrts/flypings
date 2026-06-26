@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient();
 
-  for (const entry of body.entry) {
+  try { for (const entry of body.entry) {
     const events = parseWebhookEntry(entry);
     const igUserId = entry.id;
 
@@ -149,6 +149,10 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+  }
+
+  } } catch (err) {
+    console.error("[Webhook] Unhandled error:", err);
   }
 
   return NextResponse.json({ status: "ok" });
