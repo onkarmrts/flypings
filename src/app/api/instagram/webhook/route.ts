@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, parseWebhookEntry } from "@/lib/instagram/webhook";
+import { InstagramClient } from "@/lib/instagram/api";
+import { createAdminClient } from "@/lib/db/supabase-admin";
 import type { InstagramWebhookEntry } from "@/types/instagram";
 
-/**
- * GET — Meta verifies your webhook endpoint once when you register it.
- * It sends hub.mode, hub.verify_token, hub.challenge.
- * Return the challenge to confirm ownership.
- */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
@@ -17,16 +13,9 @@ export async function GET(req: NextRequest) {
   if (mode === "subscribe" && token === process.env.WEBHOOK_VERIFY_TOKEN) {
     return new NextResponse(challenge, { status: 200 });
   }
-
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
-/**
- * POST — Every real-time event (comment, DM, story reply) hits here.
- * 1. Verify signature
- * 2. Parse events
- * 3. Match against active automations and trigger DMs
- */
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("x-hub-signature-256") ?? "";
@@ -35,26 +24,127 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const body = JSON.parse(rawBody) as {
-    object: string;
-    entry: InstagramWebhookEntry[];
-  };
+  const body = JSON.parse(rawBody) as { object: string; entry: InstagramWebhookEntry[] };
+  if (body.object !== "instagram") return NextResponse.json({ status: "ignored" });
 
-  if (body.object !== "instagram") {
-    return NextResponse.json({ status: "ignored" });
-  }
+  const supabase = createAdminClient();
 
   for (const entry of body.entry) {
     const events = parseWebhookEntry(entry);
+    const igUserId = entry.id;
+
+    const { data: account } = await supabase
+      .from("instagram_accounts")
+      .select("id, user_id, access_token, ig_user_id")
+      .eq("ig_user_id", igUserId)
+      .eq("is_active", true)
+      .single();
+
+    if (!account) continue;
+
+    const { data: automations } = await supabase
+      .from("automations")
+      .select("id, trigger_config, actions, reply_once, post_id")
+      .eq("account_id", account.id)
+      .eq("trigger_type", "comment_keyword")
+      .eq("is_active", true);
+
+    if (!automations?.length) continue;
+
+    const igClient = new InstagramClient(account.access_token, account.ig_user_id);
 
     for (const event of events) {
-      // TODO: Match event against active automations in DB
-      // TODO: Check replyOnce — skip if already DM'd this user for this post
-      // TODO: Call InstagramClient.sendDM() with the automation's action message
-      console.log("Webhook event:", event);
+      if (event.type !== "comment") continue;
+
+      for (const automation of automations) {
+        const { keywords = [], caseSensitive = false } = automation.trigger_config as {
+          keywords: string[];
+          caseSensitive: boolean;
+        };
+
+        const commentText = caseSensitive ? event.text : event.text.toUpperCase();
+        const matched = keywords.some((kw: string) =>
+          commentText.includes(caseSensitive ? kw : kw.toUpperCase())
+        );
+        if (!matched) continue;
+
+        // If scoped to a specific post, skip non-matching media
+        if (automation.post_id && event.mediaId && !automation.post_id.includes(event.mediaId)) {
+          continue;
+        }
+
+        if (automation.reply_once) {
+          const { count } = await supabase
+            .from("dm_logs")
+            .select("id", { count: "exact", head: true })
+            .eq("automation_id", automation.id)
+            .eq("recipient_ig_id", event.fromUserId)
+            .eq("status", "sent");
+
+          if ((count ?? 0) > 0) {
+            await supabase.from("dm_logs").insert({
+              automation_id: automation.id,
+              account_id: account.id,
+              recipient_ig_id: event.fromUserId,
+              recipient_username: event.fromUsername,
+              trigger_type: "comment_keyword",
+              trigger_text: event.text,
+              message_sent: "",
+              status: "skipped",
+            });
+            continue;
+          }
+        }
+
+        const action = (automation.actions as Array<{ type: string; message: string; link?: string | null }>)[0];
+        if (!action) continue;
+
+        let messageText = action.message
+          .replace(/\{\{name\}\}/gi, event.fromUsername || "there")
+          .replace(/\{\{username\}\}/gi, `@${event.fromUsername || "there"}`)
+          .replace(/\{\{keyword\}\}/gi, event.text);
+
+        if (action.link) messageText = `${messageText}\n\n${action.link}`;
+
+        let status: "sent" | "failed" = "sent";
+        let errorMsg: string | null = null;
+
+        try {
+          await igClient.sendDM(event.fromUserId, messageText);
+        } catch (err) {
+          status = "failed";
+          errorMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[Webhook] sendDM failed for ${event.fromUserId}:`, errorMsg);
+        }
+
+        await supabase.from("dm_logs").insert({
+          automation_id: automation.id,
+          account_id: account.id,
+          recipient_ig_id: event.fromUserId,
+          recipient_username: event.fromUsername,
+          trigger_type: "comment_keyword",
+          trigger_text: event.text,
+          message_sent: messageText,
+          status,
+          error: errorMsg,
+        });
+
+        if (status === "sent") {
+          await supabase.from("leads").upsert(
+            {
+              user_id: account.user_id,
+              account_id: account.id,
+              ig_user_id: event.fromUserId,
+              username: event.fromUsername,
+              source_automation_id: automation.id,
+              source_trigger: "comment_keyword",
+            },
+            { onConflict: "account_id,ig_user_id", ignoreDuplicates: true }
+          );
+        }
+      }
     }
   }
 
-  // Always return 200 fast — Meta will retry if you're slow
   return NextResponse.json({ status: "ok" });
 }

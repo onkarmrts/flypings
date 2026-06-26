@@ -65,16 +65,18 @@ export class InstagramClient {
 
   /** Send a DM to a user (requires instagram_manage_messages) */
   async sendDM(recipientIgScopedId: string, text: string) {
-    return this.request<{ recipient_id: string; message_id: string }>(
-      `/${this.igUserId}/messages`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          recipient: { id: recipientIgScopedId },
-          message: { text },
-        }),
-      }
-    );
+    const res = await fetch(`${FB_BASE_URL}/${this.igUserId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: { id: recipientIgScopedId },
+        message: { text },
+        access_token: this.accessToken,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new InstagramAPIError(data.error.message, data.error.code, data.error.type);
+    return data as { recipient_id: string; message_id: string };
   }
 
   /** Get recent media (posts, reels) */
