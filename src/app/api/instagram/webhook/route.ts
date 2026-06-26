@@ -33,13 +33,16 @@ export async function POST(req: NextRequest) {
     const events = parseWebhookEntry(entry);
     const igUserId = entry.id;
 
-    const { data: account } = await supabase
+    console.log("[Webhook] entry.id:", igUserId, "| events:", JSON.stringify(events));
+
+    const { data: account, error: accErr } = await supabase
       .from("instagram_accounts")
       .select("id, user_id, access_token, ig_user_id")
       .eq("ig_user_id", igUserId)
       .eq("is_active", true)
       .single();
 
+    console.log("[Webhook] account lookup:", account ? `found ${account.id}` : `not found (${accErr?.message})`);
     if (!account) continue;
 
     const { data: automations } = await supabase
@@ -49,11 +52,13 @@ export async function POST(req: NextRequest) {
       .eq("trigger_type", "comment_keyword")
       .eq("is_active", true);
 
+    console.log("[Webhook] automations found:", automations?.length ?? 0);
     if (!automations?.length) continue;
 
     const igClient = new InstagramClient(account.access_token, account.ig_user_id);
 
     for (const event of events) {
+      console.log("[Webhook] event type:", event.type, "| text:", event.text, "| from:", event.fromUserId);
       if (event.type !== "comment") continue;
 
       for (const automation of automations) {
