@@ -188,6 +188,11 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   }
   const longToken = step2.access_token;
 
+  // Check what permissions were actually granted
+  const permsRes = await fetch(`${FB_BASE_URL}/me/permissions?access_token=${longToken}`);
+  const perms = await permsRes.json();
+  console.log("[IG Connect] Granted permissions:", JSON.stringify(perms));
+
   // Step 3a: Get Facebook Pages → find linked IG business account
   const pagesRes = await fetch(
     `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token,instagram_business_account`
