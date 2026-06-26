@@ -15,11 +15,18 @@ export function verifyWebhookSignature(
       .createHmac("sha256", appSecret)
       .update(rawBody)
       .digest("hex")}`;
+    console.log("[Sig] received:", signature.slice(0, 20), "...");
+    console.log("[Sig] expected:", expected.slice(0, 20), "...");
+    console.log("[Sig] secret length:", appSecret?.length ?? "MISSING");
     const a = Buffer.from(expected);
     const b = Buffer.from(signature);
-    if (a.length !== b.length) return false;
+    if (a.length !== b.length) {
+      console.log("[Sig] length mismatch:", a.length, "vs", b.length);
+      return false;
+    }
     return crypto.timingSafeEqual(a, b);
-  } catch {
+  } catch (err) {
+    console.log("[Sig] error:", err);
     return false;
   }
 }
