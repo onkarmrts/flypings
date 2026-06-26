@@ -192,14 +192,13 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   const pages = await pagesRes.json();
   console.log("[IG Connect] Pages:", JSON.stringify(pages?.data?.map((p: {id: string; name: string}) => ({ id: p.id, name: p.name }))));
 
-  // Step 4: Check each page for a linked Instagram business account
+  // Step 4: Check each page returned by /me/accounts
   for (const p of (pages.data ?? []) as Array<{ id: string; name: string; access_token: string }>) {
     const igRes = await fetch(
       `${FB_BASE_URL}/${p.id}?fields=instagram_business_account&access_token=${p.access_token}`
     );
     const igData = await igRes.json();
     console.log(`[IG Connect] Page "${p.name}" IG:`, JSON.stringify(igData.instagram_business_account));
-
     if (igData.instagram_business_account?.id) {
       return {
         pageAccessToken: p.access_token,
@@ -209,36 +208,37 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
     }
   }
 
-  // Step 5a: Try nested instagram_accounts field on /me
-  const meIgRes = await fetch(
-    `${FB_BASE_URL}/me?fields=instagram_accounts{id,username,name,profile_picture_url,followers_count}&access_token=${longToken}`
+  // Step 5: Use debug_token to get ALL page IDs the user actually granted
+  // (some pages don't appear in /me/accounts but are still grantable via OAuth)
+  const appToken = `${process.env.FACEBOOK_APP_ID}|${process.env.FACEBOOK_APP_SECRET}`;
+  const debugRes = await fetch(
+    `${FB_BASE_URL}/debug_token?input_token=${longToken}&access_token=${appToken}`
   );
-  const meIg = await meIgRes.json();
-  console.log("[IG Connect] me.instagram_accounts:", JSON.stringify(meIg?.instagram_accounts));
+  const debugData = await debugRes.json();
+  console.log("[IG Connect] debug_token granular_scopes:", JSON.stringify(debugData?.data?.granular_scopes));
 
-  const nestedIg = meIg?.instagram_accounts?.data?.[0];
-  if (nestedIg?.id) {
-    return {
-      pageAccessToken: longToken,
-      igUserId: String(nestedIg.id),
-      pageName: nestedIg.username ?? nestedIg.name ?? "Instagram",
-    };
-  }
+  const grantedPageIds: string[] = debugData?.data?.granular_scopes
+    ?.find((s: { scope: string; target_ids?: string[] }) => s.scope === "pages_show_list")
+    ?.target_ids ?? [];
 
-  // Step 5b: Try /me/instagram_accounts endpoint
-  const igProfileRes = await fetch(
-    `${FB_BASE_URL}/me/instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${longToken}`
-  );
-  const igProfile = await igProfileRes.json();
-  console.log("[IG Connect] /me/instagram_accounts:", JSON.stringify(igProfile));
+  console.log("[IG Connect] Granted page IDs:", grantedPageIds);
 
-  const igAccount = igProfile.data?.[0];
-  if (igAccount?.id) {
-    return {
-      pageAccessToken: longToken,
-      igUserId: String(igAccount.id),
-      pageName: igAccount.username ?? igAccount.name ?? "Instagram",
-    };
+  for (const pageId of grantedPageIds) {
+    // Try to get page access token and instagram_business_account directly
+    const pageRes = await fetch(
+      `${FB_BASE_URL}/${pageId}?fields=id,name,access_token,instagram_business_account&access_token=${longToken}`
+    );
+    const pageData = await pageRes.json();
+    console.log(`[IG Connect] Direct page ${pageId}:`, JSON.stringify({ name: pageData.name, ig: pageData.instagram_business_account }));
+
+    if (pageData.instagram_business_account?.id) {
+      const pageToken = pageData.access_token ?? longToken;
+      return {
+        pageAccessToken: pageToken,
+        igUserId: pageData.instagram_business_account.id as string,
+        pageName: pageData.name ?? pageId,
+      };
+    }
   }
 
   throw new Error("no_instagram_page");
