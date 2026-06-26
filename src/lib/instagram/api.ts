@@ -224,21 +224,33 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   console.log("[IG Connect] Granted page IDs:", grantedPageIds);
 
   for (const pageId of grantedPageIds) {
-    // Try to get page access token and instagram_business_account directly
     const pageRes = await fetch(
       `${FB_BASE_URL}/${pageId}?fields=id,name,access_token,instagram_business_account&access_token=${longToken}`
     );
     const pageData = await pageRes.json();
     console.log(`[IG Connect] Direct page ${pageId}:`, JSON.stringify({ name: pageData.name, ig: pageData.instagram_business_account }));
-
     if (pageData.instagram_business_account?.id) {
-      const pageToken = pageData.access_token ?? longToken;
       return {
-        pageAccessToken: pageToken,
+        pageAccessToken: pageData.access_token ?? longToken,
         igUserId: pageData.instagram_business_account.id as string,
         pageName: pageData.name ?? pageId,
       };
     }
+  }
+
+  // Step 6: Extract Instagram user ID directly from debug_token granular_scopes
+  const igUserId = debugData?.data?.granular_scopes
+    ?.find((s: { scope: string; target_ids?: string[] }) => s.scope === "instagram_basic")
+    ?.target_ids?.[0];
+
+  console.log("[IG Connect] Instagram user ID from token:", igUserId);
+
+  if (igUserId) {
+    return {
+      pageAccessToken: longToken,
+      igUserId: String(igUserId),
+      pageName: "Instagram",
+    };
   }
 
   throw new Error("no_instagram_page");
