@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/supabase-server";
-import { toggleAutomation, deleteAutomation } from "./actions";
+import { AutomationActions } from "./automation-actions";
 
 const AUTOMATION_TYPES = [
   {
@@ -173,35 +173,7 @@ export default async function AutomationsPage() {
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                      <form action={toggleAutomation}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="is_active" value={String(a.is_active)} />
-                        <button
-                          type="submit"
-                          className={`relative w-10 h-5 rounded-full transition-colors ${
-                            a.is_active ? "bg-[#8B5CF6]" : "bg-[#27272A]"
-                          }`}
-                        >
-                          <div
-                            className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                              a.is_active ? "translate-x-5" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </form>
-
-                      <form action={deleteAutomation}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <button
-                          type="submit"
-                          className="text-[#52525B] hover:text-[#EF4444] text-xs transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </form>
-                    </div>
+                    <AutomationActions id={a.id} isActive={a.is_active} />
                   </div>
                 </div>
               );
