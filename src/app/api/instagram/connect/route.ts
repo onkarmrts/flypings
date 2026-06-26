@@ -86,9 +86,7 @@ export async function GET(req: NextRequest) {
 
 /** Subscribe the IG account to webhook fields so comments trigger our endpoint */
 async function subscribeToWebhooks(igUserId: string, accessToken: string) {
-  const webhookUrl = `${APP_URL}/api/instagram/webhook`;
-
-  await fetch(
+  const res = await fetch(
     `https://graph.facebook.com/v21.0/${igUserId}/subscribed_apps`,
     {
       method: "POST",
@@ -96,9 +94,9 @@ async function subscribeToWebhooks(igUserId: string, accessToken: string) {
       body: JSON.stringify({
         subscribed_fields: ["comments", "messages", "mentions"],
         access_token: accessToken,
-        callback_url: webhookUrl,
-        verify_token: process.env.WEBHOOK_VERIFY_TOKEN,
       }),
     }
   );
+  const data = await res.json();
+  console.log("[IG Connect] Webhook subscription:", JSON.stringify(data));
 }
