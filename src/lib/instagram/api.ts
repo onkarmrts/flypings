@@ -209,12 +209,28 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
     }
   }
 
-  // Step 5: Fallback — Instagram accounts linked directly to this Facebook profile
+  // Step 5a: Try nested instagram_accounts field on /me
+  const meIgRes = await fetch(
+    `${FB_BASE_URL}/me?fields=instagram_accounts{id,username,name,profile_picture_url,followers_count}&access_token=${longToken}`
+  );
+  const meIg = await meIgRes.json();
+  console.log("[IG Connect] me.instagram_accounts:", JSON.stringify(meIg?.instagram_accounts));
+
+  const nestedIg = meIg?.instagram_accounts?.data?.[0];
+  if (nestedIg?.id) {
+    return {
+      pageAccessToken: longToken,
+      igUserId: String(nestedIg.id),
+      pageName: nestedIg.username ?? nestedIg.name ?? "Instagram",
+    };
+  }
+
+  // Step 5b: Try /me/instagram_accounts endpoint
   const igProfileRes = await fetch(
     `${FB_BASE_URL}/me/instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${longToken}`
   );
   const igProfile = await igProfileRes.json();
-  console.log("[IG Connect] instagram_accounts:", JSON.stringify(igProfile));
+  console.log("[IG Connect] /me/instagram_accounts:", JSON.stringify(igProfile));
 
   const igAccount = igProfile.data?.[0];
   if (igAccount?.id) {
