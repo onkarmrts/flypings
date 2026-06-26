@@ -164,7 +164,12 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
         code,
       })
   );
-  const { access_token: shortToken } = await tokenRes.json();
+  const step1 = await tokenRes.json();
+  console.log("[IG Connect] Step1 token exchange:", JSON.stringify(step1));
+  if (!step1.access_token) {
+    throw new Error(`Step1 failed: ${step1.error?.message ?? JSON.stringify(step1)}`);
+  }
+  const shortToken = step1.access_token;
 
   // Step 2: Short-lived → long-lived token (60 days)
   const longRes = await fetch(
@@ -176,13 +181,19 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
         fb_exchange_token: shortToken,
       })
   );
-  const { access_token: longToken } = await longRes.json();
+  const step2 = await longRes.json();
+  console.log("[IG Connect] Step2 long token:", step2.access_token ? "OK" : JSON.stringify(step2));
+  if (!step2.access_token) {
+    throw new Error(`Step2 failed: ${step2.error?.message ?? JSON.stringify(step2)}`);
+  }
+  const longToken = step2.access_token;
 
   // Step 3: Get Facebook Pages → find linked IG account
   const pagesRes = await fetch(
     `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,instagram_business_account`
   );
   const pages = await pagesRes.json();
+  console.log("[IG Connect] Step3 pages:", JSON.stringify(pages));
 
   const page = pages.data?.find(
     (p: { instagram_business_account?: { id: string } }) => p.instagram_business_account
