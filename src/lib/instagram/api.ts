@@ -53,14 +53,14 @@ export class InstagramClient {
 
   /** Get basic account info */
   async getAccountInfo() {
-    return this.request<{
-      id: string;
-      name: string;
-      username: string;
-      profile_picture_url: string;
-      followers_count: number;
-      media_count: number;
-    }>(`/me?fields=id,name,username,profile_picture_url,followers_count,media_count`);
+    const res = await fetch(
+      `${FB_BASE_URL}/${this.igUserId}?fields=id,name,username,profile_picture_url,followers_count,media_count&access_token=${this.accessToken}`
+    );
+    if (!res.ok) throw new InstagramAPIError("Failed to fetch account info");
+    return res.json() as Promise<{
+      id: string; name: string; username: string;
+      profile_picture_url: string; followers_count: number; media_count: number;
+    }>;
   }
 
   /** Send a DM to a user (requires instagram_manage_messages) */
@@ -192,12 +192,8 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   const pages = await pagesRes.json();
   console.log("[IG Connect] Pages:", JSON.stringify(pages?.data?.map((p: {id: string; name: string}) => ({ id: p.id, name: p.name }))));
 
-  if (!pages.data?.length) {
-    throw new Error("no_pages");
-  }
-
   // Step 4: Check each page for a linked Instagram business account
-  for (const p of pages.data as Array<{ id: string; name: string; access_token: string }>) {
+  for (const p of (pages.data ?? []) as Array<{ id: string; name: string; access_token: string }>) {
     const igRes = await fetch(
       `${FB_BASE_URL}/${p.id}?fields=instagram_business_account&access_token=${p.access_token}`
     );
@@ -211,6 +207,22 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
         pageName: p.name,
       };
     }
+  }
+
+  // Step 5: Fallback — Instagram accounts linked directly to this Facebook profile
+  const igProfileRes = await fetch(
+    `${FB_BASE_URL}/me/instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${longToken}`
+  );
+  const igProfile = await igProfileRes.json();
+  console.log("[IG Connect] instagram_accounts:", JSON.stringify(igProfile));
+
+  const igAccount = igProfile.data?.[0];
+  if (igAccount?.id) {
+    return {
+      pageAccessToken: longToken,
+      igUserId: String(igAccount.id),
+      pageName: igAccount.username ?? igAccount.name ?? "Instagram",
+    };
   }
 
   throw new Error("no_instagram_page");
