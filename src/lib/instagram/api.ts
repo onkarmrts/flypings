@@ -185,24 +185,33 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   }
   const longToken = step2.access_token as string;
 
-  // Step 3: Get Facebook Pages with linked Instagram
+  // Step 3: Get all Facebook Pages this user manages
   const pagesRes = await fetch(
-    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token,instagram_business_account`
+    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token`
   );
   const pages = await pagesRes.json();
-  console.log("[IG Connect] Pages:", JSON.stringify(pages));
+  console.log("[IG Connect] Pages:", JSON.stringify(pages?.data?.map((p: {id: string; name: string}) => ({ id: p.id, name: p.name }))));
 
-  const page = pages.data?.find(
-    (p: { instagram_business_account?: { id: string } }) => p.instagram_business_account
-  );
-
-  if (!page) {
-    throw new Error("no_instagram_page");
+  if (!pages.data?.length) {
+    throw new Error("no_pages");
   }
 
-  return {
-    pageAccessToken: (page.access_token ?? longToken) as string,
-    igUserId: page.instagram_business_account.id as string,
-    pageName: page.name as string,
-  };
+  // Step 4: Check each page for a linked Instagram business account
+  for (const p of pages.data as Array<{ id: string; name: string; access_token: string }>) {
+    const igRes = await fetch(
+      `${FB_BASE_URL}/${p.id}?fields=instagram_business_account&access_token=${p.access_token}`
+    );
+    const igData = await igRes.json();
+    console.log(`[IG Connect] Page "${p.name}" IG:`, JSON.stringify(igData.instagram_business_account));
+
+    if (igData.instagram_business_account?.id) {
+      return {
+        pageAccessToken: p.access_token,
+        igUserId: igData.instagram_business_account.id as string,
+        pageName: p.name,
+      };
+    }
+  }
+
+  throw new Error("no_instagram_page");
 }
