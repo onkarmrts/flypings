@@ -76,8 +76,10 @@ export async function GET(req: NextRequest) {
     );
   } catch (err) {
     console.error("Instagram connect error:", err);
+    const msg = err instanceof Error ? err.message : "";
+    const code = msg.includes("No Instagram") ? "no_instagram" : "failed";
     return NextResponse.redirect(
-      `${APP_URL}/dashboard/settings/instagram?error=failed`
+      `${APP_URL}/dashboard/settings/instagram?error=${code}`
     );
   }
 }

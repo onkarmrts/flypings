@@ -128,6 +128,8 @@ export default async function InstagramSettingsPage({
           <p className="text-[#EF4444] text-sm">
             {hasError === "denied"
               ? "You cancelled the connection. Try again when you're ready."
+              : hasError === "no_instagram"
+              ? "No Instagram Professional account found. Make sure your Instagram is set to Creator or Business and is linked to a Facebook Page."
               : "Something went wrong. Please try again."}
           </p>
         </div>
