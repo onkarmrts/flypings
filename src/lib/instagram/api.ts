@@ -60,7 +60,7 @@ export class InstagramClient {
       profile_picture_url: string;
       followers_count: number;
       media_count: number;
-    }>(`/${this.igUserId}?fields=id,name,username,profile_picture_url,followers_count,media_count`);
+    }>(`/me?fields=id,name,username,profile_picture_url,followers_count,media_count`);
   }
 
   /** Send a DM to a user (requires instagram_manage_messages) */
@@ -129,56 +129,57 @@ export class InstagramAPIError extends Error {
 }
 
 /**
- * Build the Facebook OAuth URL to connect an Instagram account.
- * Redirect user here to start the OAuth flow.
+ * Build the Instagram Business Login OAuth URL.
+ * Uses Instagram's own OAuth — no Facebook Page required.
  */
 export function buildFacebookOAuthURL(redirectUri: string, state: string) {
   const params = new URLSearchParams({
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: redirectUri,
     scope: [
-      "instagram_basic",
-      "instagram_manage_messages",
-      "instagram_manage_comments",
-      "pages_show_list",
+      "instagram_business_basic",
+      "instagram_business_manage_messages",
+      "instagram_business_manage_comments",
     ].join(","),
     response_type: "code",
     state,
   });
 
-  return `https://www.facebook.com/v21.0/dialog/oauth?${params}`;
+  return `https://www.instagram.com/oauth/authorize?${params}`;
 }
 
 /**
- * Exchange auth code → page access token → IG user ID
- * Call this in your /api/instagram/connect route
+ * Exchange auth code → long-lived Instagram token → IG user ID
+ * Uses Instagram Business Login flow (no Facebook Page needed)
  */
 export async function exchangeCodeForToken(code: string, redirectUri: string) {
-  // Step 1: Code → short-lived user token
-  const tokenRes = await fetch(
-    `${FB_BASE_URL}/oauth/access_token?` +
-      new URLSearchParams({
-        client_id: process.env.FACEBOOK_APP_ID!,
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
-        redirect_uri: redirectUri,
-        code,
-      })
-  );
+  // Step 1: Code → short-lived Instagram token
+  const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.FACEBOOK_APP_ID!,
+      client_secret: process.env.FACEBOOK_APP_SECRET!,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code,
+    }),
+  });
   const step1 = await tokenRes.json();
-  console.log("[IG Connect] Step1 token exchange:", JSON.stringify(step1));
+  console.log("[IG Connect] Step1 token exchange:", step1.access_token ? "OK" : JSON.stringify(step1));
   if (!step1.access_token) {
-    throw new Error(`Step1 failed: ${step1.error?.message ?? JSON.stringify(step1)}`);
+    throw new Error(`Step1 failed: ${step1.error_message ?? JSON.stringify(step1)}`);
   }
-  const shortToken = step1.access_token;
+  const shortToken = step1.access_token as string;
+  const igUserId = String(step1.user_id);
 
   // Step 2: Short-lived → long-lived token (60 days)
   const longRes = await fetch(
-    `${FB_BASE_URL}/oauth/access_token?` +
+    `https://graph.instagram.com/access_token?` +
       new URLSearchParams({
-        grant_type: "fb_exchange_token",
-        client_id: process.env.FACEBOOK_APP_ID!,
+        grant_type: "ig_exchange_token",
         client_secret: process.env.FACEBOOK_APP_SECRET!,
-        fb_exchange_token: shortToken,
+        access_token: shortToken,
       })
   );
   const step2 = await longRes.json();
@@ -186,49 +187,10 @@ export async function exchangeCodeForToken(code: string, redirectUri: string) {
   if (!step2.access_token) {
     throw new Error(`Step2 failed: ${step2.error?.message ?? JSON.stringify(step2)}`);
   }
-  const longToken = step2.access_token;
 
-  // Check what permissions were actually granted
-  const permsRes = await fetch(`${FB_BASE_URL}/me/permissions?access_token=${longToken}`);
-  const perms = await permsRes.json();
-  console.log("[IG Connect] Granted permissions:", JSON.stringify(perms));
-
-  // Step 3a: Get Facebook Pages → find linked IG business account
-  const pagesRes = await fetch(
-    `${FB_BASE_URL}/me/accounts?access_token=${longToken}&fields=id,name,access_token,instagram_business_account`
-  );
-  const pages = await pagesRes.json();
-  console.log("[IG Connect] Step3a pages:", JSON.stringify(pages));
-
-  const page = pages.data?.find(
-    (p: { instagram_business_account?: { id: string } }) => p.instagram_business_account
-  );
-
-  if (page) {
-    // Use the Page's own access token for API calls (required for messaging)
-    const pageToken = page.access_token ?? longToken;
-    return {
-      pageAccessToken: pageToken,
-      igUserId: page.instagram_business_account.id as string,
-      pageName: page.name as string,
-    };
-  }
-
-  // Step 3b: Fallback — try Instagram accounts linked to personal Facebook profile
-  const igAccountsRes = await fetch(
-    `${FB_BASE_URL}/me/instagram_accounts?fields=id,username,name,profile_picture_url,followers_count&access_token=${longToken}`
-  );
-  const igAccounts = await igAccountsRes.json();
-  console.log("[IG Connect] Step3b instagram_accounts:", JSON.stringify(igAccounts));
-
-  const igAccount = igAccounts.data?.[0];
-  if (igAccount) {
-    return {
-      pageAccessToken: longToken,
-      igUserId: igAccount.id as string,
-      pageName: igAccount.username as string,
-    };
-  }
-
-  throw new Error("No Instagram Professional account linked to this Facebook account. Create a Facebook Page and link your Instagram to it.");
+  return {
+    pageAccessToken: step2.access_token as string,
+    igUserId,
+    pageName: igUserId,
+  };
 }
